@@ -1,0 +1,265 @@
+#!/bin/csh -f
+set sim            = nc
+set test           = srio_test_base
+set num_lanes      = 4
+set crf_en         = "SUPPTD"
+set srio_br        = "5G" 
+set srio_speed     = "SRIO_5"
+set srio_version   = "SRIO_GEN22"
+set srio_addr_mode = 34
+set srio_devid     = "SRIO_DEVID_8"
+set srio_ver       = "2_2"
+set srio_dev_id    = 8
+set addr_mode      = "SRIO_ADDR_34"
+set idle_sel       = 2
+set brc3_training_mode = 0
+set register_model_set = 1
+set cov            = 0
+set dump           = 0
+set seed = $$
+
+if(! $?UVM_PATH ) then
+echo "Please set UVM_PATH variable"
+exit
+endif
+
+if(! $?SRIO_VIP_PATH ) then
+echo "Please set SRIO_VIP_PATH variable"
+exit
+endif
+
+if(! -e logs ) then
+mkdir logs
+endif
+
+# ----------------- parse command line options -------------------
+while( "$1" != "" )
+	if( "$1" == "-s" || "$1" == "-sim" ) then
+		shift
+		set sim = "$1"
+		shift
+	else if( "$1" == "-t" || "$1" == "-test" ) then
+		shift
+		set test = "$1"
+		shift
+	else if( "$1" == "-l" || "$1" == "-lane" ) then
+		shift
+		set num_lanes = "$1"
+		shift
+	else if( "$1" == "-crf") then
+		shift
+		set crf_en = "$1"
+		shift
+	else if( "$1" == "-b" ||  "$1" == "-baudrate" ) then
+		shift
+		set srio_br = "$1"
+		shift
+	else if( "$1" == "-v" || "$1" == "-srio_ver" ) then
+		shift
+		set srio_ver = "$1"
+		shift
+	else if( "$1" == "-i" || "$1" == "-dev_id") then
+		shift
+		set srio_dev_id = "$1"
+		shift
+	else if( "$1" == "-a" ||  "$1" == "-addr_mode") then
+		shift
+		set srio_addr_mode = "$1"
+		shift
+	else if( "$1" == "-is" ||  "$1" == "-idle_sel") then
+		shift
+		set idle_sel = "$1"
+		shift
+	else if( "$1" == "-tm" ||  "$1" == "-brc3_training_mode") then
+		shift
+		set brc3_training_mode = "$1"
+		shift
+	else if( "$1" == "-rm" ||  "$1" == "-register_model_set") then
+		shift
+		set register_model_set = "$1"
+		shift
+        else if( "$1" == "-rs" ||  "$1" == "-seed") then
+               shift
+               set seed = "$1"
+               shift
+	else if( "$1" == "-c" ||  "$1" == "-cov") then
+		set cov = 1
+		shift
+	else if( "$1" == "-d" ||  "$1" == "-dump") then
+		set dump = 1
+		shift
+	else if( "$1" == "-h" || "$1" == "-help" ) then
+		goto SHOW_OPTIONS
+	else
+		echo "Unrecognized Option $1"
+		goto SHOW_OPTIONS
+		exit
+	endif
+end
+
+if( ${srio_br} == "10_3125G") then
+set srio_speed = "SRIO_103125"
+else if( ${srio_br} == "6_25G") then
+set srio_speed = "SRIO_625"
+else if( ${srio_br} == "5G") then
+set srio_speed = "SRIO_5"
+else if( ${srio_br} == "3_125G") then
+set srio_speed = "SRIO_3125"
+else if( ${srio_br} == "2_5G") then
+set srio_speed = "SRIO_25"
+else if( ${srio_br} == "1_25G") then
+set srio_speed = "SRIO_125"
+endif
+
+if( ${srio_ver} == "3_0")then
+set srio_version = "SRIO_GEN30"
+else if( ${srio_ver} == "2_2")then
+set srio_version = "SRIO_GEN22"
+else if( ${srio_ver} == "2_1")then
+set srio_version = "SRIO_GEN21"
+else if( ${srio_ver} == "1_3")then
+set srio_version = "SRIO_GEN13"
+endif
+
+if( ${srio_dev_id} == "8" )then
+set srio_devid = "SRIO_DEVID_8"
+else if( ${srio_dev_id} == "16" )then
+set srio_devid = "SRIO_DEVID_16"
+else if( ${srio_dev_id} == "32" )then
+set srio_devid = "SRIO_DEVID_32"
+endif
+
+
+if( ${srio_addr_mode} == "34" )then
+set addr_mode = "SRIO_ADDR_34"
+else if( ${srio_addr_mode} == "50" )then
+set addr_mode = "SRIO_ADDR_50"
+else if( ${srio_addr_mode} == "66" )then
+set addr_mode = "SRIO_ADDR_66"
+endif
+
+if( ${idle_sel} == 1)then
+set idle_sel = 1
+else if( ${idle_sel} ==  2)then
+set idle_sel = 2
+endif
+
+if( ${brc3_training_mode} == 0)then
+set brc3_training_mode = 0
+else if( ${brc3_training_mode} ==  1)then
+set brc3_training_mode = 1
+endif
+
+if( ${register_model_set} == 1)then
+set register_model_set = 1
+else if( ${register_model_set} ==  2)then
+set register_model_set = 2
+endif
+
+make -f makefile.sim clean
+
+if("$sim" == "nc") then
+  if("$cov" == "1") then
+    if("$dump" == "1") then
+      make -f makefile.sim $sim TEST_NAME=$test ADDR_MODE=$addr_mode NUM_LANES=$num_lanes SRIO_DEVID=$srio_devid CRF=$crf_en SRIO_SPEED=$srio_speed SRIO_VER=$srio_version IDLE_SEL=$idle_sel TRAINING_MODE=$brc3_training_mode REG_MODEL_SET=$register_model_set COVERAGE=$cov DUMP=$dump NC_COVERAGE="+nccoverage+ALL -covoverwrite" NC_DUMP="+tcl+run.tcl" SEED=$seed |& tee -i ${test}_${seed}.log
+    else
+      make -f makefile.sim $sim TEST_NAME=$test ADDR_MODE=$addr_mode NUM_LANES=$num_lanes SRIO_DEVID=$srio_devid CRF=$crf_en SRIO_SPEED=$srio_speed SRIO_VER=$srio_version IDLE_SEL=$idle_sel TRAINING_MODE=$brc3_training_mode REG_MODEL_SET=$register_model_set COVERAGE=$cov DUMP=$dump NC_COVERAGE="+nccoverage+ALL -covoverwrite" SEED=$seed |& tee -i ${test}_${seed}.log
+    endif
+  else
+    if("$dump" == "1") then
+      make -f makefile.sim $sim TEST_NAME=$test ADDR_MODE=$addr_mode NUM_LANES=$num_lanes SRIO_DEVID=$srio_devid CRF=$crf_en SRIO_SPEED=$srio_speed SRIO_VER=$srio_version IDLE_SEL=$idle_sel TRAINING_MODE=$brc3_training_mode REG_MODEL_SET=$register_model_set COVERAGE=$cov DUMP=$dump NC_DUMP="+tcl+run.tcl" SEED=$seed |& tee -i ${test}_${seed}.log
+    else
+      make -f makefile.sim $sim TEST_NAME=$test ADDR_MODE=$addr_mode NUM_LANES=$num_lanes SRIO_DEVID=$srio_devid CRF=$crf_en SRIO_SPEED=$srio_speed SRIO_VER=$srio_version IDLE_SEL=$idle_sel TRAINING_MODE=$brc3_training_mode REG_MODEL_SET=$register_model_set COVERAGE=$cov DUMP=$dump SEED=$seed |& tee -i ${test}_${seed}.log
+    endif
+  endif
+endif
+
+if("$sim" == "questa") then
+  make -f makefile.sim $sim TEST_NAME=$test ADDR_MODE=$addr_mode NUM_LANES=$num_lanes SRIO_DEVID=$srio_devid CRF=$crf_en SRIO_SPEED=$srio_speed SRIO_VER=$srio_version IDLE_SEL=$idle_sel TRAINING_MODE=$brc3_training_mode REG_MODEL_SET=$register_model_set COVERAGE=$cov DUMP=$dump SEED=$seed |& tee -i ${test}_${seed}.log
+endif
+
+if ("$sim" == "vcs") then
+  if("$cov" == "1") then
+    if("$dump" == "1") then 
+      make -f makefile.sim $sim TEST_NAME=$test ADDR_MODE=$addr_mode NUM_LANES=$num_lanes SRIO_DEVID=$srio_devid CRF=$crf_en SRIO_SPEED=$srio_speed SRIO_VER=$srio_version IDLE_SEL=$idle_sel TRAINING_MODE=$brc3_training_mode REG_MODEL_SET=$register_model_set COVERAGE=$cov DUMP=$dump VCS_COVERAGE="-cm line" VCS_DUMP="+vcs+dumpvars+test.vpd" SEED=$seed |& tee -i ${test}_${seed}.log
+    else  
+      make -f makefile.sim $sim TEST_NAME=$test ADDR_MODE=$addr_mode NUM_LANES=$num_lanes SRIO_DEVID=$srio_devid CRF=$crf_en SRIO_SPEED=$srio_speed SRIO_VER=$srio_version IDLE_SEL=$idle_sel TRAINING_MODE=$brc3_training_mode REG_MODEL_SET=$register_model_set COVERAGE=$cov DUMP=$dump VCS_COVERAGE="-cm line" SEED=$seed |& tee -i ${test}_${seed}.log
+    endif
+  else
+    if("$dump" == "1") then 
+      make -f makefile.sim $sim TEST_NAME=$test ADDR_MODE=$addr_mode NUM_LANES=$num_lanes SRIO_DEVID=$srio_devid CRF=$crf_en SRIO_SPEED=$srio_speed SRIO_VER=$srio_version IDLE_SEL=$idle_sel TRAINING_MODE=$brc3_training_mode REG_MODEL_SET=$register_model_set COVERAGE=$cov DUMP=$dump VCS_DUMP="+vcs+dumpvars+test.vpd" SEED=$seed |& tee -i ${test}_${seed}.log
+    else  
+      make -f makefile.sim $sim TEST_NAME=$test ADDR_MODE=$addr_mode NUM_LANES=$num_lanes SRIO_DEVID=$srio_devid CRF=$crf_en SRIO_SPEED=$srio_speed SRIO_VER=$srio_version IDLE_SEL=$idle_sel TRAINING_MODE=$brc3_training_mode REG_MODEL_SET=$register_model_set COVERAGE=$cov DUMP=$dump SEED=$seed |& tee -i ${test}_${seed}.log
+    endif
+  endif
+endif
+
+if("$sim" == "questa") then
+  if("$dump" == "1") then
+    mv vsim.wlf "$test"_"$$".wlf
+  endif
+endif
+
+if("$sim" == "nc") then
+  if("$cov" == "1") then
+    mv cov_work "$test"_"$$"_cov_work
+  endif
+  if("$dump" == "1") then
+    mv trace1.shm "$test"_"$$".shm
+  endif
+endif  
+
+if("$sim" == "vcs") then
+  if("$cov" == "1") then
+    mv simv.vdb "$test"_"$$".vdb
+  endif
+  if("$dump" == "1") then
+    mv test.vpd "$test"_"$$".vpd
+  endif
+endif
+mv ${test}_${seed}.log logs/.
+goto DONE
+
+SHOW_OPTIONS:
+echo "Usage: RUN simulator testname lanewidth srio_version...]" 
+echo "Options are:" 
+echo "   -s or -sim        Simulator" 
+echo "      One of nc,vcs,questa" 
+echo "      default is nc "
+echo "   -t or -test       Name of test" 
+echo "      Should be one of the test from test library" 
+echo "   -l or -lane        Number of Lanes" 
+echo "      Should be one of 1,2,4,8,16" 
+echo "      default is 4 "
+echo "   -crf        CRF Support" 
+echo "      Should be one of NOT_SUPPTD,SUPPTD" 
+echo "      default is SUPPTD "
+echo "   -b or -baudrate   SRIO Baudrate" 
+echo "      Should be one of 1_25G,2_5G,3_125G,5G,6_25G,10_3125G" 
+echo "      default is 5G "
+echo "   -i or -dev_id      SRIO Device ID"
+echo "      Should be one of 8,16,32" 
+echo "      default is 8"
+echo "   -a or -addr_mode   SRIO Address mode"
+echo "      Should be one of 34,50,66" 
+echo "      default is 34"
+echo "   -v or -srio_ver    SRIO Specification Version" 
+echo "      Should be one of 1_3,2_1,2_2,3_0" 
+echo "      default is 2_2 "
+echo "   -is or -idle_sel  GEN2 Idle Selection" 
+echo "      Should be one of 1, 2" 
+echo "      default is 2"
+echo "   -tm or -brc3_training_mode  GEN3 Training Mode Selection" 
+echo "      Should be one of 0 - SHORT_RUN, 1 - LONG_RUN" 
+echo "      default is 0"
+echo "   -rm or -register_model_set Register Model Set Selection" 
+echo "      Should be one of 1 - RM-I, 2 - RM-II" 
+echo "      default is 1"
+echo "   -rs or -seed  random seed value" 
+echo "      can be any value"
+echo "      default is process id("$$")"
+echo "   -c or -cov      Enable Functional Coverage"
+echo "   -d or -dump     Enable DUMP"
+echo "   -help             Shows options"
+
+DONE:
